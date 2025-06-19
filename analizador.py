@@ -59,17 +59,18 @@ def detectar_precio_con_color(imagen, y1, y2, x1, x2, hsv_min, hsv_max):
 
 
 def analizar_imagen_con_recortes(ruta_imagen):
+    resultado = []
     img, img_reducida = cargar_imagen(ruta_imagen)
     if img is None:
-        return
+        return "❌ No se pudo cargar la imagen."
 
     # === Recortes RSI y par ===
     zona_rsi = img[2042:2107, 7:242]
     zona_par = img[302:367, 7:225]
     texto_rsi = pytesseract.image_to_string(zona_rsi)
     texto_par = pytesseract.image_to_string(zona_par)
-    print("🧾 Texto RSI:", texto_rsi.strip())
-    print("🧾 Texto Par/Temporalidad:", texto_par.strip())
+    resultado.append(f"🧾 Texto RSI: {texto_rsi.strip()}")
+    resultado.append(f"🧾 Texto Par/Temporalidad: {texto_par.strip()}")
 
     # === RSI ===
     rsi = None
@@ -87,16 +88,16 @@ def analizar_imagen_con_recortes(ruta_imagen):
     eq = cv2.equalizeHist(gris_macd)
     _, bin_macd = cv2.threshold(eq, 130, 255, cv2.THRESH_BINARY)
     texto_macd = pytesseract.image_to_string(bin_macd, config='--psm 6')
-    print("🧾 OCR MACD crudo:", texto_macd.strip())
+    resultado.append(f"🧾 OCR MACD crudo: {texto_macd.strip()}")
     texto_macd = texto_macd.replace('\n', ' ').replace('–', '-').replace(':', '.').replace('O', '0').replace('UID', '12')
     nums = re.findall(r'-?\d+\.\d+', texto_macd)
     macd_val = float(nums[0]) if len(nums) > 0 else None
     signal_val = float(nums[1]) if len(nums) > 1 else None
 
-    # === PRECIO (zona definida por el usuario) ===
+    # === PRECIO ===
     y1, y2 = 377, 1187
     x1, x2 = 1155, 1317
-    precio = detectar_precio_con_color(img, y1, y2, x1, x2, np.array([20, 100, 100]), np.array([35, 255, 255]))  # amarillo
+    precio = detectar_precio_con_color(img, y1, y2, x1, x2, np.array([20, 100, 100]), np.array([35, 255, 255]))
 
     # === EMAs ===
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -108,76 +109,73 @@ def analizar_imagen_con_recortes(ruta_imagen):
     avg_blue_y = np.mean(blue_coords[:,0]) if blue_coords.size > 0 else None
 
     # === ANÁLISIS ===
-    print("\n📊 ANÁLISIS TÉCNICO")
+    resultado.append("\n📊 ANÁLISIS TÉCNICO")
     if rsi:
-        print(f"✅ RSI detectado: {rsi}")
+        resultado.append(f"✅ RSI detectado: {rsi}")
         if rsi < 30:
-            print("🟢 RSI en sobreventa → posible COMPRA")
+            resultado.append("🟢 RSI en sobreventa → posible COMPRA")
         elif rsi > 70:
-            print("🔴 RSI en sobrecompra → posible VENTA")
+            resultado.append("🔴 RSI en sobrecompra → posible VENTA")
         elif rsi < 40:
-            print("🔻 RSI bajista")
+            resultado.append("🔻 RSI bajista")
         elif rsi > 60:
-            print("🔺 RSI alcista")
+            resultado.append("🔺 RSI alcista")
         else:
-            print("🟡 RSI neutral")
+            resultado.append("🟡 RSI neutral")
     else:
-        print("❓ RSI no detectado.")
+        resultado.append("❓ RSI no detectado.")
 
     if macd_val is not None and signal_val is not None:
-        print(f"✅ MACD: {macd_val}, Señal: {signal_val}")
+        resultado.append(f"✅ MACD: {macd_val}, Señal: {signal_val}")
         if abs(macd_val - signal_val) < 0.05:
-            print("🔄 MACD y Señal cercanos → Consolidación")
+            resultado.append("🔄 MACD y Señal cercanos → Consolidación")
         elif macd_val > signal_val:
-            print("📈 MACD alcista")
+            resultado.append("📈 MACD alcista")
         else:
-            print("📉 MACD bajista")
+            resultado.append("📉 MACD bajista")
     else:
-        print("❓ MACD no detectado correctamente.")
+        resultado.append("❓ MACD no detectado correctamente.")
 
     if avg_blue_y and avg_red_y:
-        print(f"🔵 EMA50 (azul): Y promedio = {avg_blue_y:.1f}")
-        print(f"🔴 EMA200 (roja): Y promedio = {avg_red_y:.1f}")
+        resultado.append(f"🔵 EMA50 (azul): Y promedio = {avg_blue_y:.1f}")
+        resultado.append(f"🔴 EMA200 (roja): Y promedio = {avg_red_y:.1f}")
         if avg_blue_y < avg_red_y:
-            print("✅ EMA50 sobre EMA200 → Golden Cross (alcista)")
+            resultado.append("✅ EMA50 sobre EMA200 → Golden Cross (alcista)")
         else:
-            print("⚠️ EMA50 bajo EMA200 → Death Cross (bajista)")
+            resultado.append("⚠️ EMA50 bajo EMA200 → Death Cross (bajista)")
     else:
-        print("❓ EMAs no detectadas con precisión.")
+        resultado.append("❓ EMAs no detectadas con precisión.")
 
     if precio:
-        print(f"💰 Precio actual detectado: {precio}")
-
-        # Calculamos un margen dinámico (por ejemplo 0.5% del precio)
+        resultado.append(f"💰 Precio actual detectado: {precio}")
         margen = precio * 0.005
-
         zona_baja = precio - margen
         zona_alta = precio + margen
-
-        print(f"📐 Margen dinámico aplicado: ±{margen:.2f}")
-        print(f"📌 Zonas: baja < {zona_baja:.2f}, media entre {zona_baja:.2f} y {zona_alta:.2f}, alta > {zona_alta:.2f}")
-
-        # Ahora comparamos el precio con esas zonas
+        resultado.append(f"📐 Margen dinámico aplicado: ±{margen:.2f}")
+        resultado.append(f"📌 Zonas: baja < {zona_baja:.2f}, media entre {zona_baja:.2f} y {zona_alta:.2f}, alta > {zona_alta:.2f}")
         if precio < zona_baja:
-            print("📉 Precio en zona baja (posible soporte)")
+            resultado.append("📉 Precio en zona baja (posible soporte)")
         elif precio > zona_alta:
-            print("📈 Precio en zona alta (posible resistencia)")
+            resultado.append("📈 Precio en zona alta (posible resistencia)")
         else:
-            print("📊 Precio en zona media")
+            resultado.append("📊 Precio en zona media")
     else:
-        print("❓ Precio actual no detectado.")
+        resultado.append("❓ Precio actual no detectado.")
 
     # === Recomendación Final ===
-    print("\n📌 Recomendación general:")
+    resultado.append("\n📌 Recomendación general:")
     if all([rsi, macd_val is not None, avg_blue_y, avg_red_y, precio]):
         if rsi < 30 and macd_val > signal_val and avg_blue_y < avg_red_y:
-            print("🟢 Señales alineadas para posible COMPRA")
+            resultado.append("🟢 Señales alineadas para posible COMPRA")
         elif rsi > 70 and macd_val < signal_val and avg_blue_y > avg_red_y:
-            print("🔴 Señales alineadas para posible VENTA")
+            resultado.append("🔴 Señales alineadas para posible VENTA")
         else:
-            print("🕒 Señales mixtas → esperar confirmación")
+            resultado.append("🕒 Señales mixtas → esperar confirmación")
     else:
-        print("🔍 Datos incompletos → revisar imagen o recortes")
+        resultado.append("🔍 Datos incompletos → revisar imagen o recortes")
+
+    return "\n".join(resultado)
+
 
 # Ejecutar análisis
 #analizar_imagen_con_recortes("image.jpg")
