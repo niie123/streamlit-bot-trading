@@ -51,34 +51,33 @@ def analizar_imagen_con_recortes(ruta_imagen):
     if img is None:
         return "❌ No se pudo cargar la imagen."
 
-       # === Recortes RSI y par ===
-    zona_rsi = img[2032:2115, 7:397]
+    # === Recortes RSI y par ===
+    zona_rsi = img[2042:2107, 7:242]
     zona_par = img[302:367, 7:225]
     
-    # 👉 Preprocesamiento fuerte del RSI
+    # ✅ Preprocesamiento mejorado del RSI
     gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gris_rsi, (3,3), 0)
     bin_rsi = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                                      cv2.THRESH_BINARY, 11, 2)
-
     
-    # 👉 OCR con configuración precisa
-    config_rsi = "--psm 7 -c tessedit_char_whitelist=0123456789.RSI() "
-    texto_rsi = pytesseract.image_to_string(bin_rsi, config=config_rsi)
-    
-    # Mostrar el texto crudo en consola y resultado
+    # ✅ OCR
     texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 6')
     print("🧾 Texto crudo RSI OCR:", texto_rsi.strip())
-
     
-    # 👉 Intentar extraer el valor RSI (ej. RSI(14) 70.04)
+    # ✅ Extracción robusta de número decimal
     rsi = None
-    coincidencia = re.search(r'(\d{2}\.\d{2})', texto_rsi.replace(",", "."))
-    if coincidencia:
+    matches = re.findall(r'(\d{2}\.\d{2})', texto_rsi)
+    if matches:
         try:
-            rsi = float(coincidencia.group(1))
+            rsi = float(matches[0])
         except:
-            rsi = None
+            pass
+    
+    # ✅ Par / temporalidad (opcional)
+    texto_par = pytesseract.image_to_string(zona_par)
+    print("🧾 Texto Par/Temporalidad:", texto_par.strip())
+
 
 
 
