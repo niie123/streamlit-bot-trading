@@ -97,8 +97,8 @@ def analizar_imagen_con_recortes(ruta_imagen):
     signal_val = float(nums[1]) if len(nums) > 1 else None
 
     # Precio
-    y1, y2 = 377, 1187
-    x1, x2 = 1155, 1317
+    y1, y2 = 195, 1237
+    x1, x2 = 1110, 1315
     precio = detectar_precio_con_color(img, y1, y2, x1, x2, np.array([20, 100, 100]), np.array([35, 255, 255]))
 
     # EMAs
