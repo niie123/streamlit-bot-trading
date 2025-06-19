@@ -94,39 +94,47 @@ def analizar_imagen_con_recortes(ruta_imagen):
     print("🧾 Texto RSI:", texto_rsi.strip())
 
 
-    # === EXTRACCIÓN Y LIMPIEZA DEL RSI ===
-    rsi = None
-    
-    # Mostrar texto original crudo
-    print("🧾 Texto crudo RSI OCR:", texto_rsi.strip())
-    
-    # 🔧 Limpieza básica para evitar errores comunes de OCR
-    texto_rsi_limpio = (
-        texto_rsi.upper()
-        .replace("RSI", "")
-        .replace("(", "")
-        .replace(")", "")
-        .replace(":", "")
-        .replace("=", "")
-        .replace("I", "1")
-        .replace("L", "1")
-        .replace("|", "1")
-        .replace("O", "0")
-        .replace(" ", "")
-    )
-    
-    # 🔍 Buscar número decimal
-    numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi_limpio)
-    
-    # ✅ Tomar solo el primer número válido (0-100)
-    for num in numeros_rsi:
-        try:
-            valor = float(num)
-            if 0 < valor <= 100:
-                rsi = valor
-                break
-        except:
-            continue
+    # === RECORTE RSI ===
+zona_rsi = img[2042:2107, 7:242]
+
+# Preprocesamiento del RSI
+gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
+eq_rsi = cv2.equalizeHist(gris_rsi)
+_, bin_rsi = cv2.threshold(eq_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+# OCR y limpieza
+texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
+print("🧾 Texto crudo RSI OCR:", texto_rsi.strip())
+
+# Limpiar texto y extraer solo el valor del RSI entre 0 y 100
+rsi = None
+texto_rsi_limpio = (
+    texto_rsi.upper()
+    .replace("RSI", "")
+    .replace("(", "")
+    .replace(")", "")
+    .replace(":", "")
+    .replace("=", "")
+    .replace("I", "1")
+    .replace("L", "1")
+    .replace("|", "1")
+    .replace("O", "0")
+    .replace("S", "5")
+    .replace(" ", "")
+)
+
+# Buscar números válidos
+numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi_limpio)
+
+for num in numeros_rsi:
+    try:
+        valor = float(num)
+        if 0 < valor <= 100:
+            rsi = valor
+            break
+    except:
+        continue
+
 
 
 
