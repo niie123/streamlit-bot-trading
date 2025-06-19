@@ -67,20 +67,29 @@ def analizar_imagen_con_recortes(ruta_imagen):
     # === Recortes RSI y par ===
     zona_rsi = img[2042:2107, 7:242]
     zona_par = img[302:367, 7:225]
-    texto_rsi = pytesseract.image_to_string(zona_rsi)
-    texto_par = pytesseract.image_to_string(zona_par)
-    resultado.append(f"🧾 Texto RSI: {texto_rsi.strip()}")
-    resultado.append(f"🧾 Texto Par/Temporalidad: {texto_par.strip()}")
-
-    # === RSI ===
+    
+    # 👉 Preprocesamiento de RSI
+    gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
+    eq_rsi = cv2.equalizeHist(gris_rsi)
+    _, bin_rsi = cv2.threshold(eq_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    
+    # 👉 Extraer texto con pytesseract
+    texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
+    st.image(bin_rsi, caption="📋 Recorte RSI procesado", channels="GRAY")  # (opcional, útil para depuración en Streamlit)
+    print("🧾 Texto RSI:", texto_rsi.strip())
+    
+    # 👉 Extraer número decimal con expresión regular
     rsi = None
-    for token in texto_rsi.split():
+    numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi)
+    if numeros_rsi:
         try:
-            if token.replace('.', '', 1).isdigit():
-                rsi = float(token)
-                break
+            rsi = float(numeros_rsi[0])
         except:
-            continue
+            pass
+    
+    # 👉 Par / temporalidad (sin cambios de preprocesamiento aquí por ahora)
+    texto_par = pytesseract.image_to_string(zona_par)
+    print("🧾 Texto Par/Temporalidad:", texto_par.strip())
 
     # === MACD ===
     zona_macd = img[1260:1310, 12:610]
