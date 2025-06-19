@@ -59,9 +59,14 @@ def analizar_imagen_con_recortes(ruta_imagen):
     texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
 
     rsi = None
-    texto_rsi_limpio = texto_rsi.upper().replace("RSI", "").replace("(", "").replace(")", "").replace(":", "").replace("=", "").replace("I", "1").replace("L", "1").replace("|", "1").replace("O", "0").replace("S", "5").replace(" ", "")
+    # Correcciones comunes OCR
+    texto_rsi_limpio = texto_rsi.upper().replace("I", "1").replace("L", "1").replace("O", "0").replace("S", "5").replace("B", "8")
+    
+    # Buscar todos los valores decimales del texto
     numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi_limpio)
-    for num in numeros_rsi:
+    
+    # Elegir el último número entre 0 y 100
+    for num in reversed(numeros_rsi):
         try:
             valor = float(num)
             if 0 < valor <= 100:
@@ -69,6 +74,7 @@ def analizar_imagen_con_recortes(ruta_imagen):
                 break
         except:
             continue
+
 
     # Par
     zona_par = img[302:367, 7:225]
