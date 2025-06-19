@@ -4,9 +4,6 @@ import numpy as np
 import re
 import os
 
-# Ruta al ejecutable de Tesseract
-#pytesseract.pytesseract.tesseract_cmd = r"C:\Users\00082484\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
-
 # 🔧 Escala global para redimensionar la imagen (40%)
 ESCALA = 0.4
 
@@ -44,7 +41,6 @@ def detectar_precio_con_color(imagen, y1, y2, x1, x2, hsv_min, hsv_max):
             for token in texto_precio.split():
                 try:
                     limpio = token.replace(",", "").replace("¢", "").replace("O", "0").replace("S", "5").replace("B", "8")
-                    # Si es todo dígitos y largo, intenta inferir el punto decimal
                     if limpio.isdigit() and len(limpio) >= 5:
                         corregido = float(limpio[:-2] + "." + limpio[-2:])
                     else:
@@ -54,12 +50,16 @@ def detectar_precio_con_color(imagen, y1, y2, x1, x2, hsv_min, hsv_max):
                         return corregido
                 except:
                     continue
-
     return None
-
 
 def analizar_imagen_con_recortes(ruta_imagen):
     resultado = []
+    try:
+        import streamlit as st
+        uso_streamlit = True
+    except ImportError:
+        uso_streamlit = False
+
     img, img_reducida = cargar_imagen(ruta_imagen)
     if img is None:
         return "❌ No se pudo cargar la imagen."
@@ -67,18 +67,19 @@ def analizar_imagen_con_recortes(ruta_imagen):
     # === Recortes RSI y par ===
     zona_rsi = img[2042:2107, 7:242]
     zona_par = img[302:367, 7:225]
-    
+
     # 👉 Preprocesamiento de RSI
     gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
     eq_rsi = cv2.equalizeHist(gris_rsi)
     _, bin_rsi = cv2.threshold(eq_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    
-    # 👉 Extraer texto con pytesseract
+
+    # 👉 Mostrar imagen procesada solo si estás en Streamlit
+    if uso_streamlit:
+        st.image(bin_rsi, caption="📋 Recorte RSI procesado", channels="GRAY", use_container_width=True)
+
     texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
-    st.image(bin_rsi, caption="📋 Recorte RSI procesado", channels="GRAY")  # (opcional, útil para depuración en Streamlit)
     print("🧾 Texto RSI:", texto_rsi.strip())
-    
-    # 👉 Extraer número decimal con expresión regular
+
     rsi = None
     numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi)
     if numeros_rsi:
@@ -86,8 +87,7 @@ def analizar_imagen_con_recortes(ruta_imagen):
             rsi = float(numeros_rsi[0])
         except:
             pass
-    
-    # 👉 Par / temporalidad (sin cambios de preprocesamiento aquí por ahora)
+
     texto_par = pytesseract.image_to_string(zona_par)
     print("🧾 Texto Par/Temporalidad:", texto_par.strip())
 
@@ -184,7 +184,3 @@ def analizar_imagen_con_recortes(ruta_imagen):
         resultado.append("🔍 Datos incompletos → revisar imagen o recortes")
 
     return "\n".join(resultado)
-
-
-# Ejecutar análisis
-#analizar_imagen_con_recortes("image.jpg")
