@@ -5,7 +5,7 @@ import re
 import os
 
 # Ruta al ejecutable de Tesseract
-pytesseract.pytesseract.tesseract_cmd = r"C:\Users\00082484\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
+#pytesseract.pytesseract.tesseract_cmd = r"C:\Users\00082484\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
 
 # 🔧 Escala global para redimensionar la imagen (40%)
 ESCALA = 0.4
