@@ -2,9 +2,7 @@ import cv2
 import pytesseract
 import numpy as np
 import re
-import os
 
-# 🔧 Escala global para redimensionar la imagen (40%)
 ESCALA = 0.4
 
 def cargar_imagen(ruta):
@@ -14,9 +12,6 @@ def cargar_imagen(ruta):
         return None, None
     reducida = cv2.resize(original, (0, 0), fx=ESCALA, fy=ESCALA)
     return original, reducida
-
-def convertir_coord(x, y):
-    return int(x / ESCALA), int(y / ESCALA)
 
 def detectar_precio_con_color(imagen, y1, y2, x1, x2, hsv_min, hsv_max):
     zona = imagen[y1:y2, x1:x2]
@@ -36,7 +31,6 @@ def detectar_precio_con_color(imagen, y1, y2, x1, x2, hsv_min, hsv_max):
                 binaria,
                 config='--psm 7 -c tessedit_char_whitelist=0123456789.'
             )
-            print("🧾 Texto Precio detectado:", texto_precio.strip())
 
             for token in texto_precio.split():
                 try:
@@ -45,7 +39,6 @@ def detectar_precio_con_color(imagen, y1, y2, x1, x2, hsv_min, hsv_max):
                         corregido = float(limpio[:-2] + "." + limpio[-2:])
                     else:
                         corregido = float(limpio)
-
                     if 0.5 < corregido < 1000000:
                         return corregido
                 except:
@@ -54,95 +47,34 @@ def detectar_precio_con_color(imagen, y1, y2, x1, x2, hsv_min, hsv_max):
 
 def analizar_imagen_con_recortes(ruta_imagen):
     resultado = []
-    try:
-        import streamlit as st
-        uso_streamlit = True
-    except ImportError:
-        uso_streamlit = False
-
-    img, img_reducida = cargar_imagen(ruta_imagen)
+    img, _ = cargar_imagen(ruta_imagen)
     if img is None:
         return "❌ No se pudo cargar la imagen."
 
-    # === Recortes RSI y par ===
+    # RSI
     zona_rsi = img[2042:2107, 7:242]
-    zona_par = img[302:367, 7:225]
-
-    # 👉 Preprocesamiento de RSI
     gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
     eq_rsi = cv2.equalizeHist(gris_rsi)
     _, bin_rsi = cv2.threshold(eq_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
 
-    # 👉 Mostrar imagen procesada solo si estás en Streamlit
-    if uso_streamlit:
-        st.image(bin_rsi, caption="📋 Recorte RSI procesado", channels="GRAY", use_container_width=True)
+    rsi = None
+    texto_rsi_limpio = texto_rsi.upper().replace("RSI", "").replace("(", "").replace(")", "").replace(":", "").replace("=", "").replace("I", "1").replace("L", "1").replace("|", "1").replace("O", "0").replace("S", "5").replace(" ", "")
+    numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi_limpio)
+    for num in numeros_rsi:
+        try:
+            valor = float(num)
+            if 0 < valor <= 100:
+                rsi = valor
+                break
+        except:
+            continue
 
-    # Opcional: escalar bin_rsi si es muy pequeño
-    bin_rsi_resized = cv2.resize(bin_rsi, None, fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
-    
-    # OCR mejorado para RSI
-    texto_rsi = pytesseract.image_to_string(
-        bin_rsi_resized,
-        config='--psm 6 -c tessedit_char_whitelist=0123456789.'
-    )
-    
-    # Mostrar texto crudo para debug
-    if uso_streamlit:
-        st.image(bin_rsi_resized, caption="📋 RSI (escalado)", channels="GRAY", use_container_width=True)
-        st.text(f"🧾 Texto crudo RSI OCR: {texto_rsi.strip()}")
-
-    print("🧾 Texto RSI:", texto_rsi.strip())
-
-
-    # === RECORTE RSI ===
-zona_rsi = img[2042:2107, 7:242]
-
-# Preprocesamiento del RSI
-gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
-eq_rsi = cv2.equalizeHist(gris_rsi)
-_, bin_rsi = cv2.threshold(eq_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-# OCR y limpieza
-texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
-print("🧾 Texto crudo RSI OCR:", texto_rsi.strip())
-
-# Limpiar texto y extraer solo el valor del RSI entre 0 y 100
-rsi = None
-texto_rsi_limpio = (
-    texto_rsi.upper()
-    .replace("RSI", "")
-    .replace("(", "")
-    .replace(")", "")
-    .replace(":", "")
-    .replace("=", "")
-    .replace("I", "1")
-    .replace("L", "1")
-    .replace("|", "1")
-    .replace("O", "0")
-    .replace("S", "5")
-    .replace(" ", "")
-)
-
-# Buscar números válidos
-numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi_limpio)
-
-for num in numeros_rsi:
-    try:
-        valor = float(num)
-        if 0 < valor <= 100:
-            rsi = valor
-            break
-    except:
-        continue
-
-
-
-
-
+    # Par
+    zona_par = img[302:367, 7:225]
     texto_par = pytesseract.image_to_string(zona_par)
-    print("🧾 Texto Par/Temporalidad:", texto_par.strip())
 
-    # === MACD ===
+    # MACD
     zona_macd = img[1260:1310, 12:610]
     gris_macd = cv2.cvtColor(zona_macd, cv2.COLOR_BGR2GRAY)
     eq = cv2.equalizeHist(gris_macd)
@@ -154,12 +86,12 @@ for num in numeros_rsi:
     macd_val = float(nums[0]) if len(nums) > 0 else None
     signal_val = float(nums[1]) if len(nums) > 1 else None
 
-    # === PRECIO ===
+    # Precio
     y1, y2 = 377, 1187
     x1, x2 = 1155, 1317
     precio = detectar_precio_con_color(img, y1, y2, x1, x2, np.array([20, 100, 100]), np.array([35, 255, 255]))
 
-    # === EMAs ===
+    # EMAs
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     red_mask = cv2.inRange(hsv, np.array([0,100,100]), np.array([10,255,255])) | cv2.inRange(hsv, np.array([160,100,100]), np.array([179,255,255]))
     blue_mask = cv2.inRange(hsv, np.array([100,100,100]), np.array([130,255,255]))
@@ -168,7 +100,7 @@ for num in numeros_rsi:
     avg_red_y = np.mean(red_coords[:,0]) if red_coords.size > 0 else None
     avg_blue_y = np.mean(blue_coords[:,0]) if blue_coords.size > 0 else None
 
-    # === ANÁLISIS ===
+    # Análisis
     resultado.append("\n📊 ANÁLISIS TÉCNICO")
     if rsi:
         resultado.append(f"✅ RSI detectado: {rsi}")
@@ -222,7 +154,6 @@ for num in numeros_rsi:
     else:
         resultado.append("❓ Precio actual no detectado.")
 
-    # === Recomendación Final ===
     resultado.append("\n📌 Recomendación general:")
     if all([rsi, macd_val is not None, avg_blue_y, avg_red_y, precio]):
         if rsi < 30 and macd_val > signal_val and avg_blue_y < avg_red_y:
