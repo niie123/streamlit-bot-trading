@@ -9,7 +9,7 @@ imagen = st.file_uploader("📷 Cargar imagen", type=["jpg", "jpeg", "png"])
 if imagen:
     with open("image.jpg", "wb") as f:
         f.write(imagen.read())
-
+    st.image("image.jpg", caption="📷 Imagen cargada", use_column_width=True)
     st.success("✅ Imagen cargada correctamente.")
     st.write("---")
 
