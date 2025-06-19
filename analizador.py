@@ -93,17 +93,29 @@ def analizar_imagen_con_recortes(ruta_imagen):
 
     print("🧾 Texto RSI:", texto_rsi.strip())
 
-    rsi = None
 
-    # Limpiar el texto para reducir errores comunes
-    limpio_rsi = texto_rsi.replace("RSI", "").replace("(", "").replace(")", "").replace(":", "").replace("=", "")
-    limpio_rsi = limpio_rsi.replace("l", "1").replace("I", "1").replace("|", "1").replace("O", "0")
-    
-    # Buscar números decimales
-    numeros_rsi = re.findall(r'\d+\.\d+', limpio_rsi)
-    
-    # Buscar el número que esté en un rango válido para RSI (0–100)
+    # === EXTRACCIÓN Y LIMPIEZA DEL RSI ===
     rsi = None
+    
+    # Limpiar el texto para eliminar posibles caracteres basura
+    texto_rsi_limpio = (
+        texto_rsi.upper()
+        .replace("RSI", "")
+        .replace("(", "")
+        .replace(")", "")
+        .replace(":", "")
+        .replace("=", "")
+        .replace("l", "1")
+        .replace("I", "1")
+        .replace("|", "1")
+        .replace("O", "0")
+        .replace(" ", "")
+    )
+    
+    # Buscar posibles números
+    numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi_limpio)
+    
+    # Validar rango del RSI
     for num in numeros_rsi:
         try:
             valor = float(num)
@@ -112,6 +124,7 @@ def analizar_imagen_con_recortes(ruta_imagen):
                 break
         except:
             continue
+
 
 
     texto_par = pytesseract.image_to_string(zona_par)
