@@ -52,7 +52,7 @@ def analizar_imagen_con_recortes(ruta_imagen):
         return "❌ No se pudo cargar la imagen."
 
        # === Recortes RSI y par ===
-    zona_rsi = img[1987:2160, 10:567]
+    zona_rsi = img[2042:2107, 130:355]
     zona_par = img[302:367, 7:225]
     
     # 👉 Preprocesamiento fuerte del RSI
