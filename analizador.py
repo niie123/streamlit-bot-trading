@@ -51,39 +51,33 @@ def analizar_imagen_con_recortes(ruta_imagen):
     if img is None:
         return "❌ No se pudo cargar la imagen."
 
-    # RSI
+       # === Recortes RSI y par ===
     zona_rsi = img[2042:2107, 7:242]
+    zona_par = img[302:367, 7:225]
+    
+    # 👉 Preprocesamiento fuerte del RSI
     gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
-    eq_rsi = cv2.equalizeHist(gris_rsi)
+    blur_rsi = cv2.GaussianBlur(gris_rsi, (3, 3), 0)
+    eq_rsi = cv2.equalizeHist(blur_rsi)
     _, bin_rsi = cv2.threshold(eq_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
-
-    rsi = None
-    # Correcciones comunes OCR
-    texto_rsi_limpio = texto_rsi.upper().replace("I", "1").replace("L", "1").replace("O", "0").replace("S", "5").replace("B", "8")
     
-    # Buscar todos los valores decimales del texto
-    numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi_limpio)
-
-    # OCR del RSI (ya binarizado)
-    texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
+    # 👉 OCR con configuración precisa
+    config_rsi = "--psm 7 -c tessedit_char_whitelist=0123456789.RSI() "
+    texto_rsi = pytesseract.image_to_string(bin_rsi, config=config_rsi)
     
-    # 🔍 Mostrar el texto crudo que devuelve Tesseract para RSI
+    # Mostrar el texto crudo en consola y resultado
     print("🧾 Texto crudo RSI OCR:", texto_rsi.strip())
-    
-    # (opcional: también puedes almacenarlo en el resultado para Streamlit si quieres mostrarlo allí)
     resultado.append(f"🧾 Texto crudo RSI OCR: {texto_rsi.strip()}")
-
     
-    # Elegir el último número entre 0 y 100
-    for num in reversed(numeros_rsi):
+    # 👉 Intentar extraer el valor RSI (ej. RSI(14) 70.04)
+    rsi = None
+    coincidencia = re.search(r'(\d{2}\.\d{2})', texto_rsi.replace(",", "."))
+    if coincidencia:
         try:
-            valor = float(num)
-            if 0 < valor <= 100:
-                rsi = valor
-                break
+            rsi = float(coincidencia.group(1))
         except:
-            continue
+            rsi = None
+
 
 
     # Par
