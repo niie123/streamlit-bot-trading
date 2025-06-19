@@ -64,6 +64,16 @@ def analizar_imagen_con_recortes(ruta_imagen):
     
     # Buscar todos los valores decimales del texto
     numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi_limpio)
+
+    # OCR del RSI (ya binarizado)
+    texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
+    
+    # 🔍 Mostrar el texto crudo que devuelve Tesseract para RSI
+    print("🧾 Texto crudo RSI OCR:", texto_rsi.strip())
+    
+    # (opcional: también puedes almacenarlo en el resultado para Streamlit si quieres mostrarlo allí)
+    resultado.append(f"🧾 Texto crudo RSI OCR: {texto_rsi.strip()}")
+
     
     # Elegir el último número entre 0 y 100
     for num in reversed(numeros_rsi):
