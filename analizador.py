@@ -81,6 +81,7 @@ def analizar_imagen_con_recortes(ruta_imagen):
 
 
 
+
     # Par
     zona_par = img[302:367, 7:225]
     texto_par = pytesseract.image_to_string(zona_par)
