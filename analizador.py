@@ -77,7 +77,20 @@ def analizar_imagen_con_recortes(ruta_imagen):
     if uso_streamlit:
         st.image(bin_rsi, caption="📋 Recorte RSI procesado", channels="GRAY", use_container_width=True)
 
-    texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
+    # Opcional: escalar bin_rsi si es muy pequeño
+    bin_rsi_resized = cv2.resize(bin_rsi, None, fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
+    
+    # OCR mejorado para RSI
+    texto_rsi = pytesseract.image_to_string(
+        bin_rsi_resized,
+        config='--psm 6 -c tessedit_char_whitelist=0123456789.'
+    )
+    
+    # Mostrar texto crudo para debug
+    if uso_streamlit:
+        st.image(bin_rsi_resized, caption="📋 RSI (escalado)", channels="GRAY", use_container_width=True)
+        st.text(f"🧾 Texto crudo RSI OCR: {texto_rsi.strip()}")
+
     print("🧾 Texto RSI:", texto_rsi.strip())
 
     rsi = None
