@@ -11,7 +11,7 @@ if imagen:
         f.write(imagen.read())
     
     # ✅ Se reemplazó use_column_width por use_container_width
-    st.image("image.jpg", caption="📷 Imagen cargada", use_container_width=True)
+    #st.image("image.jpg", caption="📷 Imagen cargada", use_container_width=True)
     
     st.success("✅ Imagen cargada correctamente.")
     st.write("---")
