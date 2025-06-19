@@ -97,7 +97,10 @@ def analizar_imagen_con_recortes(ruta_imagen):
     # === EXTRACCIÓN Y LIMPIEZA DEL RSI ===
     rsi = None
     
-    # Limpiar el texto para eliminar posibles caracteres basura
+    # Mostrar texto original crudo
+    print("🧾 Texto crudo RSI OCR:", texto_rsi.strip())
+    
+    # 🔧 Limpieza básica para evitar errores comunes de OCR
     texto_rsi_limpio = (
         texto_rsi.upper()
         .replace("RSI", "")
@@ -105,25 +108,26 @@ def analizar_imagen_con_recortes(ruta_imagen):
         .replace(")", "")
         .replace(":", "")
         .replace("=", "")
-        .replace("l", "1")
         .replace("I", "1")
+        .replace("L", "1")
         .replace("|", "1")
         .replace("O", "0")
         .replace(" ", "")
     )
     
-    # Buscar posibles números
+    # 🔍 Buscar número decimal
     numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi_limpio)
     
-    # Validar rango del RSI
+    # ✅ Tomar solo el primer número válido (0-100)
     for num in numeros_rsi:
         try:
             valor = float(num)
-            if 0 <= valor <= 100:
+            if 0 < valor <= 100:
                 rsi = valor
                 break
         except:
             continue
+
 
 
 
