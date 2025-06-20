@@ -82,10 +82,11 @@ def analizar_imagen_con_recortes(ruta_imagen):
     eq_rsi = cv2.equalizeHist(gris_rsi)
     _, bin_rsi = cv2.threshold(eq_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
-
+    print("🧾 Texto crudo RSI OCR:", texto_rsi.strip())  # <--- ya imprime
     try:
         import streamlit as st
         st.image(zona_rsi, caption="📍 Zona RSI", channels="BGR")
+        st.text(f"🧾 Texto RSI OCR: {texto_rsi.strip()}")  # <--- imprime en la app si estás en Streamlit
     except:
         cv2.imshow("📍 Zona RSI", zona_rsi)
         cv2.waitKey(0)
