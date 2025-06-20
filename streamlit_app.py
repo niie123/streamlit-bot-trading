@@ -7,7 +7,7 @@ st.set_page_config(page_title="Análisis de Trading con IA", layout="wide")
 st.title("📊 Análisis de Imagen de Trading con IA")
 st.write("Sube una imagen de un gráfico para analizar RSI, MACD, EMAs y detectar patrones técnicos con visión por computadora.")
 
-imagen = st.file_uploader("📷 Cargar imagen del gráfico", type=["jpg", "jpeg", "png"])
+#imagen = st.file_uploader("📷 Cargar imagen del gráfico", type=["jpg", "jpeg", "png"])
 
 if imagen:
     with open("image.jpg", "wb") as f:
