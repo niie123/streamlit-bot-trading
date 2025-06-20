@@ -2,3 +2,6 @@ streamlit
 opencv-python-headless
 pytesseract
 numpy
+transformers
+torch
+Pillow
