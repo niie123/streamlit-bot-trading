@@ -1,31 +1,16 @@
-from ultralyticsplus import YOLO, render_result
-import cv2
-import os
 import cv2
 import pytesseract
 import numpy as np
 import re
 import os
-import torch
+from ultralyticsplus import YOLO
+from PIL import Image
 
+# Escala de redimensionado
 ESCALA = 0.4
 
-# Carga del modelo una vez
-extractor = AutoFeatureExtractor.from_pretrained("mohamedameen93/candlestick-pattern-classifier")
-model = AutoModelForImageClassification.from_pretrained("mohamedameen93/candlestick-pattern-classifier")
-model.eval()
-
-def detectar_patron_vela(imagen_path):
-    image = Image.open(imagen_path).convert("RGB")
-    inputs = extractor(images=image, return_tensors="pt")
-    with torch.no_grad():
-        outputs = model(**inputs)
-    logits = outputs.logits
-    predicted_class_idx = logits.argmax(-1).item()
-    label = model.config.id2label[predicted_class_idx]
-    confidence = torch.softmax(logits, dim=1)[0][predicted_class_idx].item()
-
-    return f"📈 Patrón de vela identificado: **{label}** con confianza de {confidence:.2%}"
+# Cache del modelo YOLO
+_model_yolo = None
 
 def cargar_imagen(ruta):
     original = cv2.imread(ruta)
@@ -48,6 +33,7 @@ def detectar_precio_con_color(imagen, y1, y2, x1, x2, hsv_min, hsv_max):
             gris = cv2.cvtColor(recorte, cv2.COLOR_BGR2GRAY)
             mejorado = cv2.equalizeHist(gris)
             _, binaria = cv2.threshold(mejorado, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
             texto_precio = pytesseract.image_to_string(
                 binaria,
                 config='--psm 7 -c tessedit_char_whitelist=0123456789.'
@@ -59,37 +45,28 @@ def detectar_precio_con_color(imagen, y1, y2, x1, x2, hsv_min, hsv_max):
                         corregido = float(limpio[:-2] + "." + limpio[-2:])
                     else:
                         corregido = float(limpio)
+
                     if 0.5 < corregido < 1000000:
                         return corregido
                 except:
                     continue
     return None
 
+def _cargar_yolo():
+    global _model_yolo
+    if _model_yolo is None:
+        _model_yolo = YOLO("foduucom/stockmarket-pattern-detection-yolov8")
+        _model_yolo.overrides['conf'] = 0.25
+        _model_yolo.overrides['iou'] = 0.45
+        _model_yolo.overrides['max_det'] = 10
+    return _model_yolo
+
 def analizar_imagen_con_recortes(ruta_imagen):
     resultado = []
-    img, _ = cargar_imagen(ruta_imagen)
+    img, img_reducida = cargar_imagen(ruta_imagen)
     if img is None:
         return "❌ No se pudo cargar la imagen."
 
-    # === Recorte de velas japonesas ===
-    velas_y1, velas_y2 = 350, 1242
-    velas_x1, velas_x2 = 15, 1147
-    zona_velas = img[velas_y1:velas_y2, velas_x1:velas_x2]
-    cv2.imwrite("recorte_velas.jpg", zona_velas)  # Se guarda para visualizar en Streamlit o procesar con modelo IA
-
-    # Cargar modelo YOLOv8 una vez
-    _model_yolo = None
-    
-    def _cargar_yolo():
-        global _model_yolo
-        if _model_yolo is None:
-            _model_yolo = YOLO('foduucom/stockmarket-pattern-detection-yolov8')
-            _model_yolo.overrides['conf'] = 0.25
-            _model_yolo.overrides['iou'] = 0.45
-            _model_yolo.overrides['max_det'] = 10
-        return _model_yolo
-
-    
     # === RSI ===
     zona_rsi = img[2042:2107, 7:242]
     gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
@@ -97,7 +74,6 @@ def analizar_imagen_con_recortes(ruta_imagen):
     _, bin_rsi = cv2.threshold(eq_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
     resultado.append(f"🧾 Texto crudo RSI OCR: {texto_rsi.strip()}")
-
     rsi = None
     numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi)
     if numeros_rsi:
@@ -105,6 +81,11 @@ def analizar_imagen_con_recortes(ruta_imagen):
             rsi = float(numeros_rsi[0])
         except:
             pass
+
+    # === PAR (no se procesa mucho)
+    zona_par = img[302:367, 7:225]
+    texto_par = pytesseract.image_to_string(zona_par)
+    resultado.append(f"🧾 Texto Par/Temporalidad: {texto_par.strip()}")
 
     # === MACD ===
     zona_macd = img[1260:1310, 12:610]
@@ -118,6 +99,11 @@ def analizar_imagen_con_recortes(ruta_imagen):
     macd_val = float(nums[0]) if len(nums) > 0 else None
     signal_val = float(nums[1]) if len(nums) > 1 else None
 
+    # === Precio ===
+    y1, y2 = 377, 1187
+    x1, x2 = 1155, 1317
+    precio = detectar_precio_con_color(img, y1, y2, x1, x2, np.array([20, 100, 100]), np.array([35, 255, 255]))
+
     # === EMAs ===
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     red_mask = cv2.inRange(hsv, np.array([0,100,100]), np.array([10,255,255])) | cv2.inRange(hsv, np.array([160,100,100]), np.array([179,255,255]))
@@ -127,6 +113,7 @@ def analizar_imagen_con_recortes(ruta_imagen):
     avg_red_y = np.mean(red_coords[:,0]) if red_coords.size > 0 else None
     avg_blue_y = np.mean(blue_coords[:,0]) if blue_coords.size > 0 else None
 
+    # === Análisis Técnico ===
     resultado.append("\n📊 ANÁLISIS TÉCNICO")
     if rsi:
         resultado.append(f"✅ RSI detectado: {rsi}")
@@ -164,16 +151,50 @@ def analizar_imagen_con_recortes(ruta_imagen):
     else:
         resultado.append("❓ EMAs no detectadas con precisión.")
 
-    if os.path.exists("recorte_velas.jpg"):
-    model = _cargar_yolo()
-    img = cv2.imread("recorte_velas.jpg")
-    results = model(img)
-    labels = [result.boxes.cls_names[0] for result in results]
-    if labels:
-        resultado.append("\n🎯 Detección de patrones en velas:")
-        for lbl in labels:
-            resultado.append(f"➡️ {lbl}")
+    if precio:
+        resultado.append(f"💰 Precio actual detectado: {precio}")
+        margen = precio * 0.005
+        zona_baja = precio - margen
+        zona_alta = precio + margen
+        resultado.append(f"📐 Margen dinámico aplicado: ±{margen:.2f}")
+        resultado.append(f"📌 Zonas: baja < {zona_baja:.2f}, media entre {zona_baja:.2f} y {zona_alta:.2f}, alta > {zona_alta:.2f}")
+        if precio < zona_baja:
+            resultado.append("📉 Precio en zona baja (posible soporte)")
+        elif precio > zona_alta:
+            resultado.append("📈 Precio en zona alta (posible resistencia)")
+        else:
+            resultado.append("📊 Precio en zona media")
+    else:
+        resultado.append("❓ Precio actual no detectado.")
 
+    # === Recomendación ===
+    resultado.append("\n📌 Recomendación general:")
+    if all([rsi, macd_val is not None, avg_blue_y, avg_red_y, precio]):
+        if rsi < 30 and macd_val > signal_val and avg_blue_y < avg_red_y:
+            resultado.append("🟢 Señales alineadas para posible COMPRA")
+        elif rsi > 70 and macd_val < signal_val and avg_blue_y > avg_red_y:
+            resultado.append("🔴 Señales alineadas para posible VENTA")
+        else:
+            resultado.append("🕒 Señales mixtas → esperar confirmación")
+    else:
+        resultado.append("🔍 Datos incompletos → revisar imagen o recortes")
 
+    # === Detección de patrones de velas ===
+    y1_v, y2_v = 600, 1180
+    x1_v, x2_v = 800, 1330
+    zona_velas = img[y1_v:y2_v, x1_v:x2_v]
+    cv2.imwrite("recorte_velas.jpg", zona_velas)
+
+    try:
+        model = _cargar_yolo()
+        results = model(zona_velas)
+        labels = results[0].names
+        clases_detectadas = results[0].boxes.cls.cpu().numpy().astype(int)
+        if len(clases_detectadas) > 0:
+            resultado.append("\n🕯️ Patrones de Velas Detectados:")
+            for i in clases_detectadas:
+                resultado.append(f"➡️ {labels[i]}")
+    except Exception as e:
+        resultado.append(f"❌ Error en detección de patrones de velas: {str(e)}")
 
     return "\n".join(resultado)
