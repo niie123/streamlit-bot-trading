@@ -64,11 +64,20 @@ def detectar_patron_velas(ruta_imagen):
         return f"❌ Error al detectar patrón de velas: {e}"
 
 def analizar_imagen_con_recortes(ruta_imagen):
+    
     resultado = []
     img, img_reducida = cargar_imagen(ruta_imagen)
     if img is None:
         return "❌ No se pudo cargar la imagen."
 
+    # === RECORTE DE ZONA DE VELAS ===
+    y1_velas, y2_velas = 352, 1252
+    x1_velas, x2_velas = 15, 1110
+    zona_velas = img[y1_velas:y2_velas, x1_velas:x2_velas]
+    
+    # Guarda el recorte para su posterior análisis con IA o visualización en Streamlit
+    cv2.imwrite("recorte_velas.jpg", zona_velas)
+        
     zona_rsi = img[2042:2107, 7:242]
     zona_par = img[302:367, 7:225]
 
@@ -102,8 +111,10 @@ def analizar_imagen_con_recortes(ruta_imagen):
 
     y1, y2 = 377, 1187
     x1, x2 = 1155, 1317
-    precio = detectar_precio_con_color(img, y1, y2, x1, x2, np.array([20, 100, 100]), np.array([35, 255, 255]))
+    precio = detectar_precio_con_color(img, y1, y2, x1, x2,
+                                       np.array([20, 100, 100]), np.array([35, 255, 255]))
 
+    # === EMAs ===
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     red_mask = cv2.inRange(hsv, np.array([0,100,100]), np.array([10,255,255])) | cv2.inRange(hsv, np.array([160,100,100]), np.array([179,255,255]))
     blue_mask = cv2.inRange(hsv, np.array([100,100,100]), np.array([130,255,255]))
@@ -112,6 +123,13 @@ def analizar_imagen_con_recortes(ruta_imagen):
     avg_red_y = np.mean(red_coords[:,0]) if red_coords.size > 0 else None
     avg_blue_y = np.mean(blue_coords[:,0]) if blue_coords.size > 0 else None
 
+    # === Recorte de velas japonesas ===
+    velas_y1, velas_y2 = 352, 1252
+    velas_x1, velas_x2 = 15, 1110
+    zona_velas = img[velas_y1:velas_y2, velas_x1:velas_x2]
+    cv2.imwrite("recorte_velas.jpg", zona_velas)
+
+    # === Análisis final ===
     resultado.append("\n📊 ANÁLISIS TÉCNICO")
     if rsi:
         resultado.append(f"✅ RSI detectado: {rsi}")
@@ -122,7 +140,7 @@ def analizar_imagen_con_recortes(ruta_imagen):
         elif rsi < 40:
             resultado.append("🔻 RSI bajista")
         elif rsi > 60:
-            resultado.append("🔺 RSI alcista")
+            resultado.append("🔹 RSI alcista")
         else:
             resultado.append("🟡 RSI neutral")
     else:
@@ -154,7 +172,7 @@ def analizar_imagen_con_recortes(ruta_imagen):
         margen = precio * 0.005
         zona_baja = precio - margen
         zona_alta = precio + margen
-        resultado.append(f"📐 Margen dinámico aplicado: ±{margen:.2f}")
+        resultado.append(f"🖐️ Margen dinámico aplicado: ±{margen:.2f}")
         resultado.append(f"📌 Zonas: baja < {zona_baja:.2f}, media entre {zona_baja:.2f} y {zona_alta:.2f}, alta > {zona_alta:.2f}")
         if precio < zona_baja:
             resultado.append("📉 Precio en zona baja (posible soporte)")
@@ -164,10 +182,6 @@ def analizar_imagen_con_recortes(ruta_imagen):
             resultado.append("📊 Precio en zona media")
     else:
         resultado.append("❓ Precio actual no detectado.")
-
-    if os.path.exists("recorte_velas.jpg"):
-        resultado.append("\n🔍 Detección de patrón de velas japonesas:")
-        resultado.append(detectar_patron_velas("recorte_velas.jpg"))
 
     resultado.append("\n📌 Recomendación general:")
     if all([rsi, macd_val is not None, avg_blue_y, avg_red_y, precio]):
