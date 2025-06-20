@@ -79,8 +79,8 @@ def analizar_imagen_con_recortes(ruta_imagen):
     # 🧾 OCR RSI
     zona_rsi = img[2042:2107, 7:242]
     gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
-    eq_rsi = cv2.equalizeHist(gris_rsi)
-    _, bin_rsi = cv2.threshold(eq_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    blur = cv2.GaussianBlur(gris_rsi, (3, 3), 0)
+    _, bin_rsi = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
     print("🧾 Texto crudo RSI OCR:", texto_rsi.strip())  # <--- ya imprime
     try:
