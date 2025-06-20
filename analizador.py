@@ -70,21 +70,19 @@ def analizar_imagen_con_recortes(ruta_imagen):
     if img is None:
         return "❌ No se pudo cargar la imagen."
 
-    # Coordenadas del recorte de velas
+    # 📌 Recorte de velas
     y1_velas, y2_velas = 285, 1247
     x1_velas, x2_velas = 12, 1312
     zona_velas = img[y1_velas:y2_velas, x1_velas:x2_velas]
     cv2.imwrite("recorte_velas.jpg", zona_velas)
 
-    # === ZONA RSI CON LECTURA MEJORADA ===
-    # OCR zona RSI
+    # 🧾 OCR RSI
     zona_rsi = img[2042:2107, 7:242]
     gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
     eq_rsi = cv2.equalizeHist(gris_rsi)
     _, bin_rsi = cv2.threshold(eq_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
-    
-    # Mostrar imagen y texto OCR
+
     try:
         import streamlit as st
         st.image(zona_rsi, caption="📍 Zona RSI", channels="BGR")
@@ -92,13 +90,11 @@ def analizar_imagen_con_recortes(ruta_imagen):
         cv2.imshow("📍 Zona RSI", zona_rsi)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
-    
-    # Debug de OCR
+
     cv2.imwrite("debug_rsi.jpg", zona_rsi)
     cv2.imwrite("debug_rsi_bin.jpg", bin_rsi)
     print("🧾 Texto crudo RSI OCR:", repr(texto_rsi))
-    
-    # Extracción del valor RSI
+
     rsi = None
     match = re.search(r'RSI\s*\(?\d+\)?\s*[=:]?\s*(\d{1,3}\.\d{1,2})', texto_rsi, re.IGNORECASE)
     if match:
@@ -119,8 +115,7 @@ def analizar_imagen_con_recortes(ruta_imagen):
             except Exception as e:
                 print("⚠️ Error al convertir número RSI:", e)
 
-
-    # === MACD ===
+    # 🧾 OCR MACD
     zona_macd = img[1260:1310, 12:610]
     gris_macd = cv2.cvtColor(zona_macd, cv2.COLOR_BGR2GRAY)
     eq = cv2.equalizeHist(gris_macd)
@@ -132,23 +127,22 @@ def analizar_imagen_con_recortes(ruta_imagen):
     macd_val = float(nums[0]) if len(nums) > 0 else None
     signal_val = float(nums[1]) if len(nums) > 1 else None
 
-    # === PRECIO ===
+    # 💰 Precio actual
     precio = detectar_precio_con_color(
         img, y1=377, y2=1187, x1=1155, x2=1317,
         hsv_min=np.array([20, 100, 100]), hsv_max=np.array([35, 255, 255])
     )
 
-    # === EMAs ===
+    # 📈 EMAs
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    red_mask = cv2.inRange(hsv, np.array([0, 100, 100]), np.array([10, 255, 255])) | \
-                cv2.inRange(hsv, np.array([160, 100, 100]), np.array([179, 255, 255]))
-    blue_mask = cv2.inRange(hsv, np.array([100, 100, 100]), np.array([130, 255, 255]))
+    red_mask = cv2.inRange(hsv, np.array([0,100,100]), np.array([10,255,255])) | cv2.inRange(hsv, np.array([160,100,100]), np.array([179,255,255]))
+    blue_mask = cv2.inRange(hsv, np.array([100,100,100]), np.array([130,255,255]))
     red_coords = np.column_stack(np.where(red_mask > 0))
     blue_coords = np.column_stack(np.where(blue_mask > 0))
-    avg_red_y = np.mean(red_coords[:, 0]) if red_coords.size > 0 else None
-    avg_blue_y = np.mean(blue_coords[:, 0]) if blue_coords.size > 0 else None
+    avg_red_y = np.mean(red_coords[:,0]) if red_coords.size > 0 else None
+    avg_blue_y = np.mean(blue_coords[:,0]) if blue_coords.size > 0 else None
 
-    # === ANÁLISIS TÉCNICO ===
+    # 📊 Análisis técnico
     resultado.append("\n📊 ANÁLISIS TÉCNICO")
     if rsi:
         resultado.append(f"✅ RSI detectado: {rsi}")
@@ -202,10 +196,12 @@ def analizar_imagen_con_recortes(ruta_imagen):
     else:
         resultado.append("❓ Precio actual no detectado.")
 
+    # 🕯️ Patrón de velas
     if os.path.exists("recorte_velas.jpg"):
         resultado.append("\n🔍 Detección de patrón de velas japonesas:")
         resultado.append(detectar_patron_velas("recorte_velas.jpg"))
 
+    # 📌 Recomendación general
     resultado.append("\n📌 Recomendación general:")
     if all([rsi, macd_val is not None, avg_blue_y, avg_red_y, precio]):
         if rsi < 30 and macd_val > signal_val and avg_blue_y < avg_red_y:
