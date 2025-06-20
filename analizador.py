@@ -1,10 +1,30 @@
+from transformers import AutoFeatureExtractor, AutoModelForImageClassification
+from PIL import Image
 import cv2
 import pytesseract
 import numpy as np
 import re
 import os
+import torch
 
 ESCALA = 0.4
+
+# Carga del modelo una vez
+extractor = AutoFeatureExtractor.from_pretrained("mohamedameen93/candlestick-pattern-classifier")
+model = AutoModelForImageClassification.from_pretrained("mohamedameen93/candlestick-pattern-classifier")
+model.eval()
+
+def detectar_patron_vela(imagen_path):
+    image = Image.open(imagen_path).convert("RGB")
+    inputs = extractor(images=image, return_tensors="pt")
+    with torch.no_grad():
+        outputs = model(**inputs)
+    logits = outputs.logits
+    predicted_class_idx = logits.argmax(-1).item()
+    label = model.config.id2label[predicted_class_idx]
+    confidence = torch.softmax(logits, dim=1)[0][predicted_class_idx].item()
+
+    return f"📈 Patrón de vela identificado: **{label}** con confianza de {confidence:.2%}"
 
 def cargar_imagen(ruta):
     original = cv2.imread(ruta)
@@ -129,5 +149,11 @@ def analizar_imagen_con_recortes(ruta_imagen):
             resultado.append("⚠️ EMA50 bajo EMA200 → Death Cross (bajista)")
     else:
         resultado.append("❓ EMAs no detectadas con precisión.")
+
+    # === Clasificación con IA de velas japonesas ===
+    if os.path.exists("recorte_velas.jpg"):
+        resultado.append("\n🤖 Análisis con IA:")
+        resultado.append(detectar_patron_vela("recorte_velas.jpg"))
+
 
     return "\n".join(resultado)
