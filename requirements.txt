@@ -2,9 +2,10 @@ streamlit
 opencv-python-headless
 pytesseract
 numpy
+Pillow
 transformers
 torch
-Pillow
-opencv-python
+torchvision
+scikit-learn
+matplotlib
 ultralytics
-
