@@ -3,7 +3,7 @@ import pytesseract
 import numpy as np
 import re
 import os
-from ultralyticsplus import YOLO
+from ultralytics import YOLO
 from PIL import Image
 
 # Escala de redimensionado
