@@ -1,5 +1,6 @@
-from transformers import AutoFeatureExtractor, AutoModelForImageClassification
-from PIL import Image
+from ultralyticsplus import YOLO, render_result
+import cv2
+import os
 import cv2
 import pytesseract
 import numpy as np
@@ -76,6 +77,19 @@ def analizar_imagen_con_recortes(ruta_imagen):
     zona_velas = img[velas_y1:velas_y2, velas_x1:velas_x2]
     cv2.imwrite("recorte_velas.jpg", zona_velas)  # Se guarda para visualizar en Streamlit o procesar con modelo IA
 
+    # Cargar modelo YOLOv8 una vez
+    _model_yolo = None
+    
+    def _cargar_yolo():
+        global _model_yolo
+        if _model_yolo is None:
+            _model_yolo = YOLO('foduucom/stockmarket-pattern-detection-yolov8')
+            _model_yolo.overrides['conf'] = 0.25
+            _model_yolo.overrides['iou'] = 0.45
+            _model_yolo.overrides['max_det'] = 10
+        return _model_yolo
+
+    
     # === RSI ===
     zona_rsi = img[2042:2107, 7:242]
     gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
@@ -150,10 +164,16 @@ def analizar_imagen_con_recortes(ruta_imagen):
     else:
         resultado.append("❓ EMAs no detectadas con precisión.")
 
-    # === Clasificación con IA de velas japonesas ===
     if os.path.exists("recorte_velas.jpg"):
-        resultado.append("\n🤖 Análisis con IA:")
-        resultado.append(detectar_patron_vela("recorte_velas.jpg"))
+    model = _cargar_yolo()
+    img = cv2.imread("recorte_velas.jpg")
+    results = model(img)
+    labels = [result.boxes.cls_names[0] for result in results]
+    if labels:
+        resultado.append("\n🎯 Detección de patrones en velas:")
+        for lbl in labels:
+            resultado.append(f"➡️ {lbl}")
+
 
 
     return "\n".join(resultado)
