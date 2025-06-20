@@ -95,19 +95,23 @@ def analizar_imagen_con_recortes(ruta_imagen):
     print("🧾 Texto crudo RSI OCR:", repr(texto_rsi))
 
     rsi = None
-    match = re.search(r'RSI\s*\(?\d+\)?\s*[:\-]?\s*(\d+\.\d+)', texto_rsi, re.IGNORECASE)
+    match = re.search(r'RSI\s*\(?\d+\)?\s*[=:]?\s*(\d{1,3}\.\d{1,2})', texto_rsi, re.IGNORECASE)
     if match:
         try:
             rsi = float(match.group(1))
         except:
             pass
     else:
-        numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi)
-        if numeros_rsi:
+        numeros_rsi = re.findall(r'\d{1,3}\.\d{1,2}', texto_rsi)
+        for num in numeros_rsi:
             try:
-                rsi = float(numeros_rsi[0])
+                val = float(num)
+                if 0 < val < 100:
+                    rsi = val
+                    break
             except:
-                pass
+                continue
+
 
     # === MACD ===
     zona_macd = img[1260:1310, 12:610]
