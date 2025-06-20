@@ -5,3 +5,6 @@ numpy
 transformers
 torch
 Pillow
+ultralyticsplus==0.0.28
+ultralytics==8.3.94
+opencv-python
