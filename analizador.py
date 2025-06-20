@@ -2,6 +2,7 @@ import cv2
 import pytesseract
 import numpy as np
 import re
+import os
 
 ESCALA = 0.4
 
@@ -26,12 +27,10 @@ def detectar_precio_con_color(imagen, y1, y2, x1, x2, hsv_min, hsv_max):
             gris = cv2.cvtColor(recorte, cv2.COLOR_BGR2GRAY)
             mejorado = cv2.equalizeHist(gris)
             _, binaria = cv2.threshold(mejorado, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
             texto_precio = pytesseract.image_to_string(
                 binaria,
                 config='--psm 7 -c tessedit_char_whitelist=0123456789.'
             )
-
             for token in texto_precio.split():
                 try:
                     limpio = token.replace(",", "").replace("¢", "").replace("O", "0").replace("S", "5").replace("B", "8")
@@ -51,37 +50,29 @@ def analizar_imagen_con_recortes(ruta_imagen):
     if img is None:
         return "❌ No se pudo cargar la imagen."
 
-    # === Recorte y OCR de RSI ===
+    # === Recorte de velas japonesas ===
+    velas_y1, velas_y2 = 350, 1242
+    velas_x1, velas_x2 = 15, 1147
+    zona_velas = img[velas_y1:velas_y2, velas_x1:velas_x2]
+    cv2.imwrite("recorte_velas.jpg", zona_velas)  # Se guarda para visualizar en Streamlit o procesar con modelo IA
+
+    # === RSI ===
     zona_rsi = img[2042:2107, 7:242]
-    
-    # Preprocesamiento para OCR más robusto
     gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
-    blur_rsi = cv2.GaussianBlur(gris_rsi, (3, 3), 0)
-    _, bin_rsi = cv2.threshold(blur_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    
-    # OCR
-    texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 6')
-    print("🧾 Texto crudo RSI OCR:", texto_rsi.strip())
-    
-    # Extraer número decimal del formato "RSI(14) 40.38"
+    eq_rsi = cv2.equalizeHist(gris_rsi)
+    _, bin_rsi = cv2.threshold(eq_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
+    resultado.append(f"🧾 Texto crudo RSI OCR: {texto_rsi.strip()}")
+
     rsi = None
-    matches = re.findall(r'RSI\(14\)\s*([0-9]+[.,][0-9]+)', texto_rsi)
-    if matches:
+    numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi)
+    if numeros_rsi:
         try:
-            rsi = float(matches[0].replace(",", "."))
+            rsi = float(numeros_rsi[0])
         except:
-            rsi = None
+            pass
 
-
-
-
-
-
-    # Par
-    zona_par = img[302:367, 7:225]
-    texto_par = pytesseract.image_to_string(zona_par)
-
-    # MACD
+    # === MACD ===
     zona_macd = img[1260:1310, 12:610]
     gris_macd = cv2.cvtColor(zona_macd, cv2.COLOR_BGR2GRAY)
     eq = cv2.equalizeHist(gris_macd)
@@ -93,12 +84,7 @@ def analizar_imagen_con_recortes(ruta_imagen):
     macd_val = float(nums[0]) if len(nums) > 0 else None
     signal_val = float(nums[1]) if len(nums) > 1 else None
 
-    # Precio
-    y1, y2 = 195, 1237
-    x1, x2 = 1110, 1315
-    precio = detectar_precio_con_color(img, y1, y2, x1, x2, np.array([20, 100, 100]), np.array([35, 255, 255]))
-
-    # EMAs
+    # === EMAs ===
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     red_mask = cv2.inRange(hsv, np.array([0,100,100]), np.array([10,255,255])) | cv2.inRange(hsv, np.array([160,100,100]), np.array([179,255,255]))
     blue_mask = cv2.inRange(hsv, np.array([100,100,100]), np.array([130,255,255]))
@@ -107,7 +93,6 @@ def analizar_imagen_con_recortes(ruta_imagen):
     avg_red_y = np.mean(red_coords[:,0]) if red_coords.size > 0 else None
     avg_blue_y = np.mean(blue_coords[:,0]) if blue_coords.size > 0 else None
 
-    # Análisis
     resultado.append("\n📊 ANÁLISIS TÉCNICO")
     if rsi:
         resultado.append(f"✅ RSI detectado: {rsi}")
@@ -144,32 +129,5 @@ def analizar_imagen_con_recortes(ruta_imagen):
             resultado.append("⚠️ EMA50 bajo EMA200 → Death Cross (bajista)")
     else:
         resultado.append("❓ EMAs no detectadas con precisión.")
-
-    if precio:
-        resultado.append(f"💰 Precio actual detectado: {precio}")
-        margen = precio * 0.005
-        zona_baja = precio - margen
-        zona_alta = precio + margen
-        resultado.append(f"📐 Margen dinámico aplicado: ±{margen:.2f}")
-        resultado.append(f"📌 Zonas: baja < {zona_baja:.2f}, media entre {zona_baja:.2f} y {zona_alta:.2f}, alta > {zona_alta:.2f}")
-        if precio < zona_baja:
-            resultado.append("📉 Precio en zona baja (posible soporte)")
-        elif precio > zona_alta:
-            resultado.append("📈 Precio en zona alta (posible resistencia)")
-        else:
-            resultado.append("📊 Precio en zona media")
-    else:
-        resultado.append("❓ Precio actual no detectado.")
-
-    resultado.append("\n📌 Recomendación general:")
-    if all([rsi, macd_val is not None, avg_blue_y, avg_red_y, precio]):
-        if rsi < 30 and macd_val > signal_val and avg_blue_y < avg_red_y:
-            resultado.append("🟢 Señales alineadas para posible COMPRA")
-        elif rsi > 70 and macd_val < signal_val and avg_blue_y > avg_red_y:
-            resultado.append("🔴 Señales alineadas para posible VENTA")
-        else:
-            resultado.append("🕒 Señales mixtas → esperar confirmación")
-    else:
-        resultado.append("🔍 Datos incompletos → revisar imagen o recortes")
 
     return "\n".join(resultado)
