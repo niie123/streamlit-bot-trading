@@ -77,7 +77,14 @@ def analizar_imagen_con_recortes(ruta_imagen):
     cv2.imwrite("recorte_velas.jpg", zona_velas)
 
     # === ZONA RSI CON LECTURA MEJORADA ===
+    # OCR zona RSI
     zona_rsi = img[2042:2107, 7:242]
+    gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
+    eq_rsi = cv2.equalizeHist(gris_rsi)
+    _, bin_rsi = cv2.threshold(eq_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
+    
+    # Mostrar imagen y texto OCR
     try:
         import streamlit as st
         st.image(zona_rsi, caption="📍 Zona RSI", channels="BGR")
@@ -85,22 +92,21 @@ def analizar_imagen_con_recortes(ruta_imagen):
         cv2.imshow("📍 Zona RSI", zona_rsi)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
-
-    gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
-    eq_rsi = cv2.equalizeHist(gris_rsi)
-    _, bin_rsi = cv2.threshold(eq_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    
+    # Debug de OCR
     cv2.imwrite("debug_rsi.jpg", zona_rsi)
     cv2.imwrite("debug_rsi_bin.jpg", bin_rsi)
-    texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
     print("🧾 Texto crudo RSI OCR:", repr(texto_rsi))
-
+    
+    # Extracción del valor RSI
     rsi = None
     match = re.search(r'RSI\s*\(?\d+\)?\s*[=:]?\s*(\d{1,3}\.\d{1,2})', texto_rsi, re.IGNORECASE)
     if match:
         try:
             rsi = float(match.group(1))
-        except:
-            pass
+            print(f"✅ RSI extraído con regex: {rsi}")
+        except Exception as e:
+            print("⚠️ Error al convertir RSI con regex:", e)
     else:
         numeros_rsi = re.findall(r'\d{1,3}\.\d{1,2}', texto_rsi)
         for num in numeros_rsi:
@@ -108,9 +114,10 @@ def analizar_imagen_con_recortes(ruta_imagen):
                 val = float(num)
                 if 0 < val < 100:
                     rsi = val
+                    print(f"✅ RSI extraído sin regex (fallback): {rsi}")
                     break
-            except:
-                continue
+            except Exception as e:
+                print("⚠️ Error al convertir número RSI:", e)
 
 
     # === MACD ===
