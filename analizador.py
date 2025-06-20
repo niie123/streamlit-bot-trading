@@ -71,8 +71,8 @@ def analizar_imagen_con_recortes(ruta_imagen):
         return "❌ No se pudo cargar la imagen."
 
     # Coordenadas exactas del recorte de velas (como pediste)
-    y1_velas, y2_velas = 352, 1252
-    x1_velas, x2_velas = 15, 1110
+    y1_velas, y2_velas = 285, 1247
+    x1_velas, x2_velas = 12, 1312
     zona_velas = img[y1_velas:y2_velas, x1_velas:x2_velas]
     cv2.imwrite("recorte_velas.jpg", zona_velas)
 
