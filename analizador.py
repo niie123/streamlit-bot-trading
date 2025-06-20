@@ -84,6 +84,39 @@ def analizar_imagen_con_recortes(ruta_imagen):
     texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7')
     print("🧾 Texto crudo RSI OCR:", texto_rsi.strip())
 
+        # Muestra visual del recorte (Streamlit o local)
+    try:
+        import streamlit as st
+        st.image(zona_rsi, caption="📍 Zona RSI", channels="BGR")
+    except:
+        cv2.imshow("📍 Zona RSI", zona_rsi)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    
+    # Procesamiento para OCR
+    gris_rsi = cv2.cvtColor(zona_rsi, cv2.COLOR_BGR2GRAY)
+    eq_rsi = cv2.equalizeHist(gris_rsi)
+    _, bin_rsi = cv2.threshold(eq_rsi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    
+    # Guarda imagen binarizada para revisión manual
+    cv2.imwrite("debug_rsi.jpg", zona_rsi)
+    cv2.imwrite("debug_rsi_bin.jpg", bin_rsi)
+    
+    # OCR con whitelist
+    texto_rsi = pytesseract.image_to_string(bin_rsi, config='--psm 7 -c tessedit_char_whitelist=0123456789.')
+    
+    # Imprime todo el contenido crudo para análisis
+    print("🧾 Texto crudo RSI OCR:", repr(texto_rsi))
+    
+    # Extracción numérica
+    rsi = None
+    numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi)
+    if numeros_rsi:
+        try:
+            rsi = float(numeros_rsi[0])
+        except Exception as e:
+            print("⚠️ Error convirtiendo RSI a float:", e)
+    
     rsi = None
     numeros_rsi = re.findall(r'\d+\.\d+', texto_rsi)
     if numeros_rsi:
